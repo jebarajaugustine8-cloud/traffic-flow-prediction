@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic Flow Prediction — ML Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="logo">
+    <span class="signal-dot"></span> TRAFFIC<span class="logo-accent">FLOW</span>
+  </div>
+  <ul>
+    <li><a href="#prediction">Predict</a></li>
+    <li><a href="#forecast">Forecast</a></li>
+    <li><a href="#dashboard">Dashboard</a></li>
+    <li><a href="#model">Model</a></li>
+  </ul>
+</nav>
+
+<header class="hero">
+  <p class="eyebrow">MACHINE LEARNING · MINI PROJECT</p>
+  <h1>Traffic Flow Prediction</h1>
+  <p class="hero-sub">
+    Predicts hourly vehicle volume from time, day, weather and holiday data —
+    trained on {{ "{:,}".format(metrics.dataset_rows) }} records using
+    {{ metrics.best_model }} ({{ metrics.models[metrics.best_model].r2 }}% R²).
+  </p>
+</header>
+
+<main>
+
+<!-- ================= PREDICTION ================= -->
+<section class="panel" id="prediction">
+  <h2 class="panel-title">Run a Prediction</h2>
+
+  <div class="predict-grid">
+
+    <div class="form-side">
+      <label for="hour">Hour of day</label>
+      <input type="number" id="hour" min="0" max="23" value="18" required>
+
+      <label for="day">Day of week</label>
+      <select id="day">
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5" selected>Friday</option>
+        <option value="6">Saturday</option>
+        <option value="7">Sunday</option>
+      </select>
+
+      <label for="weather">Weather</label>
+      <select id="weather">
+        <option value="0">Clear</option>
+        <option value="1">Rain</option>
+        <option value="2">Fog</option>
+      </select>
+
+      <label for="holiday">Public holiday</label>
+      <select id="holiday">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+
+      <button id="predictBtn">Predict traffic</button>
+      <p class="error-msg" id="errorMsg"></p>
+    </div>
+
+    <!-- Signal + result -->
+    <div class="result-side" id="resultSide">
+      <div class="traffic-signal" aria-hidden="true">
+        <span class="lamp lamp-red" id="lampRed"></span>
+        <span class="lamp lamp-amber" id="lampAmber"></span>
+        <span class="lamp lamp-green" id="lampGreen"></span>
+      </div>
+      <div class="result-body">
+        <p class="result-placeholder" id="resultPlaceholder">
+          Set the conditions and run a prediction —<br>the signal will show the congestion level.
+        </p>
+        <div class="result-data hidden" id="resultData">
+          <p class="big-number"><span id="trafficValue">0</span><small> vehicles / hr</small></p>
+          <p class="level-label" id="levelLabel"></p>
+          <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
+          <p class="detail"><strong>Congestion:</strong> <span id="congestionValue"></span>%</p>
+          <p class="detail"><strong>Estimated delay:</strong> <span id="delayValue"></span></p>
+          <p class="detail advice" id="adviceValue"></p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ================= 24H FORECAST ================= -->
+<section class="panel hidden" id="forecast">
+  <h2 class="panel-title">24-Hour Forecast for the Selected Day</h2>
+  <p class="panel-sub" id="forecastHint"></p>
+  <div class="bars" id="forecastBars"></div>
+  <div class="bar-axis">
+    <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span>
+  </div>
+</section>
+
+<!-- ================= DASHBOARD ================= -->
+<section class="panel" id="dashboard">
+  <h2 class="panel-title">Dataset Dashboard</h2>
+  <div class="stats">
+    <div class="card">
+      <p class="card-label">Peak hour</p>
+      <p class="card-value">{{ "%d:00"|format(metrics.peak_hour) }}</p>
+    </div>
+    <div class="card">
+      <p class="card-label">Average traffic</p>
+      <p class="card-value">{{ metrics.avg_traffic }} <small>veh/hr</small></p>
+    </div>
+    <div class="card">
+      <p class="card-label">Max recorded</p>
+      <p class="card-value">{{ metrics.max_traffic }} <small>veh/hr</small></p>
+    </div>
+    <div class="card">
+      <p class="card-label">Records</p>
+      <p class="card-value">{{ "{:,}".format(metrics.dataset_rows) }}</p>
+    </div>
+  </div>
+
+  <div class="graph-container">
+    <figure class="graph-card">
+      <img src="{{ url_for('static', filename='graphs/hourly_traffic.png') }}" alt="Hourly traffic pattern">
+      <figcaption>Hourly pattern — weekday vs weekend</figcaption>
+    </figure>
+    <figure class="graph-card">
+      <img src="{{ url_for('static', filename='graphs/weather.png') }}" alt="Traffic by weather">
+      <figcaption>Impact of weather</figcaption>
+    </figure>
+    <figure class="graph-card wide">
+      <img src="{{ url_for('static', filename='graphs/heatmap.png') }}" alt="Day by hour heatmap">
+      <figcaption>Day × Hour heatmap</figcaption>
+    </figure>
+    <figure class="graph-card">
+      <img src="{{ url_for('static', filename='graphs/importance.png') }}" alt="Feature importance">
+      <figcaption>What the model relies on</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ================= MODEL ================= -->
+<section class="panel" id="model">
+  <h2 class="panel-title">Model Comparison</h2>
+  <p class="panel-sub">Three algorithms were trained and evaluated with 5-fold cross-validation.
+     The best one, <strong>{{ metrics.best_model }}</strong>, powers the predictions above.</p>
+
+  <table class="model-table">
+    <thead>
+      <tr><th>Algorithm</th><th>R²</th><th>MAE</th><th>RMSE</th><th>CV R² (5-fold)</th></tr>
+    </thead>
+    <tbody>
+      {% for name, m in metrics.models.items() %}
+      <tr class="{{ 'best-row' if name == metrics.best_model }}">
+        <td>{{ name }}{% if name == metrics.best_model %} 🏆{% endif %}</td>
+        <td>{{ m.r2 }}%</td>
+        <td>{{ m.mae }}</td>
+        <td>{{ m.rmse }}</td>
+        <td>{{ m.cv_r2 }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p class="feature-list"><strong>Features used:</strong> {{ metrics.features | join(", ") }}</p>
+</section>
+
+</main>
+
+<footer class="footer">
+  <h2>Traffic Flow Prediction Using Machine Learning</h2>
+  <p><strong>Developed by:</strong> AUGUSTIN JEBARAJ D · Register No. 231061101019</p>
+  <p><strong>Course:</strong> B.Tech Computer Science and Engineering</p>
+  <p><strong>Technologies:</strong> Python, Flask, Scikit-Learn, Pandas, NumPy, Matplotlib, HTML5, CSS3, JavaScript</p>
+  <p>Mini Project · Academic Year 2023–2027 · © 2026</p>
+</footer>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>

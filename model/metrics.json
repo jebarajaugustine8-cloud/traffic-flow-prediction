@@ -1,0 +1,47 @@
+{
+  "best_model": "Gradient Boosting",
+  "models": {
+    "Linear Regression": {
+      "r2": 80.06,
+      "mae": 70.24,
+      "rmse": 86.88,
+      "cv_r2": 79.89
+    },
+    "Random Forest": {
+      "r2": 97.87,
+      "mae": 17.68,
+      "rmse": 28.38,
+      "cv_r2": 97.95
+    },
+    "Gradient Boosting": {
+      "r2": 98.04,
+      "mae": 16.98,
+      "rmse": 27.27,
+      "cv_r2": 98.08
+    }
+  },
+  "features": [
+    "Hour",
+    "Day",
+    "Weather",
+    "Holiday",
+    "Hour_sin",
+    "Hour_cos",
+    "IsWeekend",
+    "IsRushHour"
+  ],
+  "feature_importance": {
+    "Hour": 0.5862,
+    "Day": 0.0712,
+    "Weather": 0.0321,
+    "Holiday": 0.023,
+    "Hour_sin": 0.1028,
+    "Hour_cos": 0.0609,
+    "IsWeekend": 0.035,
+    "IsRushHour": 0.0886
+  },
+  "dataset_rows": 8760,
+  "avg_traffic": 257.4,
+  "peak_hour": 18,
+  "max_traffic": 886
+}
