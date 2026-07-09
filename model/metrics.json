@@ -31,12 +31,12 @@
     "IsRushHour"
   ],
   "feature_importance": {
-    "Hour": 0.5862,
-    "Day": 0.0712,
+    "Hour": 0.5863,
+    "Day": 0.0713,
     "Weather": 0.0321,
     "Holiday": 0.023,
-    "Hour_sin": 0.1028,
-    "Hour_cos": 0.0609,
+    "Hour_sin": 0.1027,
+    "Hour_cos": 0.061,
     "IsWeekend": 0.035,
     "IsRushHour": 0.0886
   },
