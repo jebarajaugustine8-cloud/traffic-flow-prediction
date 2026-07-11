@@ -231,6 +231,11 @@ async function predictRoute() {
 
     routeLayer = L.layerGroup([line, oMark, dMark]).addTo(map);
     map.fitBounds(line.getBounds(), { padding: [30, 30] });
+
+    // Transport modes + race
+    lastModes = data.modes;
+    renderModeCards(data.modes, data.fastest_mode);
+    runRace(data.modes);
   } catch (err) {
     errEl.textContent = "Could not predict the route. Is the server running?";
     console.error(err);
@@ -244,5 +249,100 @@ routeBtn.addEventListener("click", predictRoute);
 
 // Show the Chennai map as soon as the page loads
 document.addEventListener("DOMContentLoaded", initMap);
+
+
+
+/* ==========================================================
+   TRANSPORT MODES + THE COMMUTE RACE + WEATHER EFFECTS
+   ========================================================== */
+
+let lastModes = null;
+
+function renderModeCards(modes, fastestKey) {
+  const wrap = document.getElementById("modeCards");
+  wrap.innerHTML = "";
+  modes.forEach((m, i) => {
+    const card = document.createElement("div");
+    card.className = "mode-card" + (m.key === fastestKey ? " fastest" : "");
+    card.style.animationDelay = `${i * 0.12}s`;
+    card.innerHTML =
+      `<span class="mode-icon">${m.icon}</span>` +
+      `<div class="mode-name">${m.name}</div>` +
+      `<div class="mode-eta">${m.eta_minutes}<small> min</small></div>` +
+      `<div class="mode-note">${m.note}</div>`;
+    wrap.appendChild(card);
+  });
+  wrap.classList.remove("hidden");
+}
+
+function runRace(modes) {
+  const lanesWrap = document.getElementById("raceLanes");
+  lanesWrap.innerHTML = "";
+  document.getElementById("raceTrack").classList.remove("hidden");
+
+  // Race duration: fastest mode takes 3s on screen, others proportionally longer (cap 10s)
+  const fastest = Math.min(...modes.map((m) => m.eta_minutes));
+  const sorted = [...modes].sort((a, b) => a.eta_minutes - b.eta_minutes);
+  const medals = { 0: "🥇", 1: "🥈", 2: "🥉" };
+
+  modes.forEach((m) => {
+    const lane = document.createElement("div");
+    lane.className = "lane";
+    const rank = sorted.findIndex((x) => x.key === m.key);
+    lane.innerHTML =
+      `<span class="lane-label">${m.name.toUpperCase()}</span>` +
+      `<span class="finish"></span>` +
+      `<span class="racer">${m.icon}</span>` +
+      `<span class="medal">${medals[rank] ?? ""}</span>` +
+      `<span class="lane-eta">${m.eta_minutes} min</span>`;
+    lanesWrap.appendChild(lane);
+
+    const secs = Math.min((m.eta_minutes / fastest) * 3, 10);
+    const racer = lane.querySelector(".racer");
+    racer.style.transitionDuration = `${secs}s`;
+    // launch on next frame so the transition fires
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        racer.style.left = "calc(100% - 100px)";
+      })
+    );
+    setTimeout(() => lane.classList.add("finished"), secs * 1000);
+  });
+
+  const winner = sorted[0];
+  document.getElementById("raceCaption").textContent =
+    `${winner.icon} ${winner.name} wins at ${winner.eta_minutes} minutes! ` +
+    `Race animation is scaled to real predicted travel times.`;
+}
+
+document.getElementById("replayBtn").addEventListener("click", () => {
+  if (lastModes) runRace(lastModes);
+});
+
+/* ---------- Weather effects (rain / fog overlays) ---------- */
+
+function buildRain() {
+  const layer = document.getElementById("rainLayer");
+  if (layer.childElementCount) return;
+  for (let i = 0; i < 70; i++) {
+    const d = document.createElement("span");
+    d.className = "drop";
+    d.style.left = `${Math.random() * 100}%`;
+    d.style.animationDuration = `${0.6 + Math.random() * 0.7}s`;
+    d.style.animationDelay = `${Math.random() * 1.5}s`;
+    layer.appendChild(d);
+  }
+}
+
+function applyWeatherEffect() {
+  const w = document.getElementById("weather").value;
+  const rain = document.getElementById("rainLayer");
+  const fog = document.getElementById("fogLayer");
+  rain.classList.toggle("active", w === "1");
+  fog.classList.toggle("active", w === "2");
+  if (w === "1") buildRain();
+}
+
+document.getElementById("weather").addEventListener("change", applyWeatherEffect);
 
 console.log("Traffic Prediction System Loaded Successfully");

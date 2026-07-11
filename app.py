@@ -121,6 +121,44 @@ def haversine_km(lat1, lng1, lat2, lng2) -> float:
 SPEED_BY_SIGNAL = {"green": 38, "amber": 24, "red": 14}
 ROAD_FACTOR = 1.35  # real roads are ~35% longer than the straight line
 
+# ---------------------------------------------------------------
+# Multi-mode transport model
+#   Road modes slow down with congestion; metro & walking do not.
+#   speeds = km/h at (green, amber, red) congestion
+# ---------------------------------------------------------------
+TRANSPORT_MODES = [
+    {"key": "car",   "name": "Car",          "icon": "🚗", "speeds": (38, 24, 14), "wait": 0,
+     "note": "door-to-door, full congestion impact"},
+    {"key": "bike",  "name": "Bike",         "icon": "🏍️", "speeds": (42, 32, 22), "wait": 0,
+     "note": "filters through traffic — least affected road mode"},
+    {"key": "bus",   "name": "Bus",          "icon": "🚌", "speeds": (25, 17, 10), "wait": 8,
+     "note": "includes ~8 min average stop wait"},
+    {"key": "train", "name": "Metro / Rail", "icon": "🚆", "speeds": (34, 34, 34), "wait": 12,
+     "note": "immune to road traffic; ~12 min station access + wait"},
+    {"key": "walk",  "name": "Walking",      "icon": "🚶", "speeds": (5, 5, 5),   "wait": 0,
+     "note": "zero traffic impact — and zero fuel"},
+]
+SIGNAL_INDEX = {"green": 0, "amber": 1, "red": 2}
+
+
+def mode_etas(distance_km: float, signal: str) -> list:
+    """ETA in minutes for every transport mode at the given congestion."""
+    idx = SIGNAL_INDEX[signal]
+    out = []
+    for m in TRANSPORT_MODES:
+        # rail path is straighter than roads; walking cuts through
+        dist = distance_km
+        if m["key"] == "train":
+            dist = distance_km / ROAD_FACTOR * 1.15
+        elif m["key"] == "walk":
+            dist = distance_km / ROAD_FACTOR * 1.25
+        minutes = dist / m["speeds"][idx] * 60 + m["wait"]
+        out.append({
+            "key": m["key"], "name": m["name"], "icon": m["icon"],
+            "eta_minutes": int(round(minutes)), "note": m["note"],
+        })
+    return out
+
 
 @app.route("/api/route", methods=["POST"])
 def api_route():
@@ -161,7 +199,12 @@ def api_route():
     best_speed = SPEED_BY_SIGNAL[classify(int(hourly[best_hour]))["signal"]]
     best_minutes = int(round(distance / best_speed * 60))
 
+    modes = mode_etas(distance, result["signal"])
+    fastest = min(modes, key=lambda m: m["eta_minutes"])["key"]
+
     return jsonify({
+        "modes": modes,
+        "fastest_mode": fastest,
         "origin": {"name": o["name"], "lat": o["lat"], "lng": o["lng"], "traffic": t_origin},
         "destination": {"name": d["name"], "lat": d["lat"], "lng": d["lng"], "traffic": t_dest},
         "route_traffic": route_traffic,

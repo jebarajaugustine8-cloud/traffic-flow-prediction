@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<div id="rainLayer" class="weather-layer"></div>
+<div id="fogLayer" class="weather-layer"></div>
 
 <nav class="navbar">
   <div class="logo">
@@ -150,6 +152,17 @@
     </div>
 
     <div id="map"></div>
+  </div>
+
+  <!-- Transport mode comparison -->
+  <div class="modes hidden" id="modeCards"></div>
+
+  <!-- The Commute Race -->
+  <div class="race hidden" id="raceTrack">
+    <h3 class="race-title">🏁 The Commute Race — who reaches first?</h3>
+    <div id="raceLanes"></div>
+    <p class="panel-sub" id="raceCaption"></p>
+    <button type="button" id="replayBtn" class="replay-btn">↻ Replay race</button>
   </div>
 </section>
 
