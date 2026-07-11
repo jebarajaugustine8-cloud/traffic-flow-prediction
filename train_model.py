@@ -38,7 +38,7 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-FEATURES = ["Hour", "Day", "Weather", "Holiday",
+FEATURES = ["Hour", "Day", "Weather", "Holiday", "Zone",
             "Hour_sin", "Hour_cos", "IsWeekend", "IsRushHour"]
 
 
@@ -60,13 +60,13 @@ def main():
             random_state=42, n_jobs=-1
         ),
         "Gradient Boosting": GradientBoostingRegressor(
-            n_estimators=300, learning_rate=0.08, max_depth=4,
+            n_estimators=200, learning_rate=0.1, max_depth=5,
             random_state=42
         ),
     }
 
     results = {}
-    print(f"{'Model':<20} {'R²':>8} {'MAE':>8} {'RMSE':>8} {'CV R² (5-fold)':>16}")
+    print(f"{'Model':<20} {'R²':>8} {'MAE':>8} {'RMSE':>8} {'CV R² (3-fold)':>16}")
     print("-" * 64)
 
     for name, model in models.items():
@@ -76,7 +76,7 @@ def main():
         r2 = r2_score(y_test, pred)
         mae = mean_absolute_error(y_test, pred)
         rmse = float(np.sqrt(mean_squared_error(y_test, pred)))
-        cv = cross_val_score(model, X, y, cv=5, scoring="r2").mean()
+        cv = cross_val_score(model, X, y, cv=3, scoring="r2", n_jobs=-1).mean()
 
         results[name] = {
             "r2": round(r2 * 100, 2),

@@ -456,3 +456,33 @@ button:disabled{ opacity:.55; cursor:wait; transform:none; }
   .graph-card.wide{ grid-column:span 1; }
   .bars{ gap:3px; height:150px; }
 }
+
+/* ---------------- ROUTE PLANNER ---------------- */
+.route-grid{
+  display:grid;
+  grid-template-columns:1fr 1.3fr;
+  gap:26px;
+  margin-top:10px;
+}
+
+#map{
+  min-height:380px;
+  border-radius:12px;
+  border:1px solid var(--line);
+  z-index:1; /* keep below sticky navbar */
+}
+
+.route-result{
+  margin-top:18px;
+  background:var(--panel-2);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:18px;
+}
+
+.leaflet-container{ background:#0a0e13; font-family:var(--body); }
+
+@media (max-width: 860px){
+  .route-grid{ grid-template-columns:1fr; }
+  #map{ min-height:300px; }
+}

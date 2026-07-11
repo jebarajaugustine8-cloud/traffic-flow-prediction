@@ -6,6 +6,7 @@
 <title>Traffic Flow Prediction — ML Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -16,6 +17,7 @@
   </div>
   <ul>
     <li><a href="#prediction">Predict</a></li>
+    <li><a href="#route">Route</a></li>
     <li><a href="#forecast">Forecast</a></li>
     <li><a href="#dashboard">Dashboard</a></li>
     <li><a href="#model">Model</a></li>
@@ -41,6 +43,11 @@
   <div class="predict-grid">
 
     <div class="form-side">
+      <label for="zone">Location (Chennai)</label>
+      <select id="zone">
+        {% for z in zones %}<option value="{{ z.id }}">{{ z.name }}</option>{% endfor %}
+      </select>
+
       <label for="hour">Hour of day</label>
       <input type="number" id="hour" min="0" max="23" value="18" required>
 
@@ -104,6 +111,45 @@
   <div class="bars" id="forecastBars"></div>
   <div class="bar-axis">
     <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>11 PM</span>
+  </div>
+</section>
+
+
+<!-- ================= ROUTE PLANNER ================= -->
+<section class="panel" id="route">
+  <h2 class="panel-title">Route Planner — Origin to Destination</h2>
+  <p class="panel-sub">Pick two Chennai locations. The model predicts traffic at both ends
+     and estimates your travel time.</p>
+
+  <div class="route-grid">
+    <div class="route-form">
+      <label for="origin">Origin</label>
+      <select id="origin">
+        {% for z in zones %}<option value="{{ z.id }}" {{ 'selected' if z.id == 0 }}>{{ z.name }}</option>{% endfor %}
+      </select>
+
+      <label for="destination">Destination</label>
+      <select id="destination">
+        {% for z in zones %}<option value="{{ z.id }}" {{ 'selected' if z.id == 1 }}>{{ z.name }}</option>{% endfor %}
+      </select>
+
+      <p class="panel-sub" style="margin:14px 0 0">Uses the hour, day, weather and holiday
+         set in the prediction form above.</p>
+
+      <button id="routeBtn" type="button">Predict route</button>
+      <p class="error-msg" id="routeError"></p>
+
+      <div class="route-result hidden" id="routeResult">
+        <p class="detail"><strong>Distance:</strong> <span id="routeDistance"></span> km (approx. by road)</p>
+        <p class="detail"><strong>Route congestion:</strong> <span id="routeLevel"></span></p>
+        <p class="detail"><strong>Estimated travel time:</strong> <span id="routeEta"></span> minutes</p>
+        <p class="detail"><strong>Traffic at origin:</strong> <span id="routeOriginT"></span> veh/hr ·
+           <strong>at destination:</strong> <span id="routeDestT"></span> veh/hr</p>
+        <p class="detail advice" id="routeAdvice"></p>
+      </div>
+    </div>
+
+    <div id="map"></div>
   </div>
 </section>
 
@@ -185,6 +231,7 @@
   <p>Mini Project · Academic Year 2023–2027 · © 2026</p>
 </footer>
 
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

@@ -20,9 +20,11 @@ Columns (same schema as the original project, so everything stays compatible):
 import numpy as np
 import pandas as pd
 
+from locations import CHENNAI_ZONES
+
 rng = np.random.default_rng(42)
 
-DAYS_IN_YEAR = 365
+DAYS_IN_YEAR = 240  # 240 days x 24 hours x 16 Chennai zones
 
 # Base hourly traffic profile for a normal weekday (vehicles/hour)
 WEEKDAY_PROFILE = np.array([
@@ -79,11 +81,13 @@ for day_of_year in range(DAYS_IN_YEAR):
 
         # Add realistic noise (~8% std deviation)
         traffic *= rng.normal(1.0, 0.08)
-        traffic = max(int(round(traffic)), 0)
 
-        rows.append([hour, day_of_week, weather, is_holiday, traffic])
+        for zone in CHENNAI_ZONES:
+            zone_traffic = traffic * zone["busyness"] * rng.normal(1.0, 0.04)
+            rows.append([hour, day_of_week, weather, is_holiday,
+                         zone["id"], max(int(round(zone_traffic)), 0)])
 
-df = pd.DataFrame(rows, columns=["Hour", "Day", "Weather", "Holiday", "Traffic"])
+df = pd.DataFrame(rows, columns=["Hour", "Day", "Weather", "Holiday", "Zone", "Traffic"])
 df.to_csv("dataset/traffic.csv", index=False)
 
 print(f"✅ Dataset generated: dataset/traffic.csv ({len(df):,} rows)")

@@ -1,4 +1,4 @@
-# 🚦 Traffic Flow Prediction Using Machine Learning (v2)
+# 🚦 Traffic Flow Prediction Using Machine Learning (v3 — Chennai Route Planner)
 
 Predicts hourly traffic volume from **time, day, weather and holiday** data,
 served through a Flask web dashboard with live predictions and a 24-hour forecast.
@@ -7,7 +7,8 @@ served through a Flask web dashboard with live predictions and a 24-hour forecas
 
 ```
 Traffic-Flow-Prediction/
-├── app.py                  # Flask server (HTML page + JSON prediction API)
+├── app.py                  # Flask server (prediction API + origin→destination route API)
+├── locations.py            # 16 Chennai zones with coordinates & busyness factors
 ├── generate_dataset.py     # Builds a realistic 8,760-row dataset (1 year, hourly)
 ├── train_model.py          # Feature engineering + trains & compares 3 models
 ├── graphs.py               # Generates the 4 dashboard charts
@@ -51,6 +52,13 @@ python app.py                # 4. start the website → http://127.0.0.1:5000
 
 (The trained model, metrics and graphs are already included, so you can also
 just run `python app.py` directly.)
+
+## New in v3 — Location support (Chennai)
+
+- **16 real Chennai localities** (Vadapalani, T. Nagar, Guindy, Koyambedu, Velachery, Tambaram, OMR, Airport...) with real coordinates
+- **Zone is now an ML feature** — the model learns that T. Nagar at 6 PM is busier than Perambur at 6 PM (dataset: 92,160 rows)
+- **Origin → Destination route planner**: predicts traffic at both ends, road distance, estimated travel time, and the best departure hour
+- **Interactive Leaflet + OpenStreetMap map** (100% free, no API key) showing the actual road route colored green/amber/red by congestion (via OSRM, with straight-line fallback)
 
 ## What's upgraded vs v1
 

@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 from flask import Flask, jsonify, render_template, request
 
+from locations import CHENNAI_ZONES, ZONE_BY_ID
 from train_model import FEATURES, engineer_features
 
 app = Flask(__name__)
@@ -29,10 +30,10 @@ with open("model/metrics.json") as f:
     METRICS = json.load(f)
 
 
-def predict_traffic(hour: int, day: int, weather: int, holiday: int) -> int:
+def predict_traffic(hour: int, day: int, weather: int, holiday: int, zone: int = 0) -> int:
     """Runs one prediction through the same feature pipeline used in training."""
     row = pd.DataFrame([{
-        "Hour": hour, "Day": day, "Weather": weather, "Holiday": holiday
+        "Hour": hour, "Day": day, "Weather": weather, "Holiday": holiday, "Zone": zone
     }])
     row = engineer_features(row)
     value = model.predict(row[FEATURES])[0]
@@ -65,7 +66,7 @@ def classify(traffic: int) -> dict:
 
 @app.route("/")
 def home():
-    return render_template("index.html", metrics=METRICS)
+    return render_template("index.html", metrics=METRICS, zones=CHENNAI_ZONES)
 
 
 @app.route("/api/predict", methods=["POST"])
@@ -76,16 +77,18 @@ def api_predict():
         day = int(data["day"])
         weather = int(data["weather"])
         holiday = int(data["holiday"])
+        zone = int(data.get("zone", 0))
         assert 0 <= hour <= 23 and 1 <= day <= 7
         assert weather in (0, 1, 2) and holiday in (0, 1)
+        assert zone in ZONE_BY_ID
     except (KeyError, ValueError, AssertionError):
         return jsonify({"error": "Invalid input"}), 400
 
-    traffic = predict_traffic(hour, day, weather, holiday)
+    traffic = predict_traffic(hour, day, weather, holiday, zone)
     result = classify(traffic)
 
     # Full 24-hour forecast for the same day/weather/holiday
-    forecast = [predict_traffic(h, day, weather, holiday) for h in range(24)]
+    forecast = [predict_traffic(h, day, weather, holiday, zone) for h in range(24)]
     best_hour = int(np.argmin(forecast))
     worst_hour = int(np.argmax(forecast))
 
@@ -97,6 +100,77 @@ def api_predict():
         "worst_hour": worst_hour,
     })
 
+
+
+
+# ---------------------------------------------------------------
+# Origin -> Destination route prediction (Chennai)
+# ---------------------------------------------------------------
+
+def haversine_km(lat1, lng1, lat2, lng2) -> float:
+    """Straight-line distance between two coordinates, in km."""
+    R = 6371.0
+    p1, p2 = np.radians(lat1), np.radians(lat2)
+    dphi = np.radians(lat2 - lat1)
+    dlmb = np.radians(lng2 - lng1)
+    a = np.sin(dphi / 2) ** 2 + np.cos(p1) * np.cos(p2) * np.sin(dlmb / 2) ** 2
+    return float(2 * R * np.arcsin(np.sqrt(a)))
+
+
+# Average speed (km/h) by congestion level — realistic for Chennai roads
+SPEED_BY_SIGNAL = {"green": 38, "amber": 24, "red": 14}
+ROAD_FACTOR = 1.35  # real roads are ~35% longer than the straight line
+
+
+@app.route("/api/route", methods=["POST"])
+def api_route():
+    data = request.get_json(force=True)
+    try:
+        origin = int(data["origin"])
+        dest = int(data["destination"])
+        hour = int(data["hour"])
+        day = int(data["day"])
+        weather = int(data["weather"])
+        holiday = int(data["holiday"])
+        assert origin in ZONE_BY_ID and dest in ZONE_BY_ID and origin != dest
+        assert 0 <= hour <= 23 and 1 <= day <= 7
+        assert weather in (0, 1, 2) and holiday in (0, 1)
+    except (KeyError, ValueError, AssertionError):
+        return jsonify({"error": "Invalid input"}), 400
+
+    o, d = ZONE_BY_ID[origin], ZONE_BY_ID[dest]
+
+    # Predict traffic at both ends of the trip
+    t_origin = predict_traffic(hour, day, weather, holiday, origin)
+    t_dest = predict_traffic(hour, day, weather, holiday, dest)
+    route_traffic = int(round((t_origin + t_dest) / 2))
+    result = classify(route_traffic)
+
+    # Distance and travel time
+    distance = haversine_km(o["lat"], o["lng"], d["lat"], d["lng"]) * ROAD_FACTOR
+    speed = SPEED_BY_SIGNAL[result["signal"]]
+    minutes = int(round(distance / speed * 60))
+
+    # Find the best departure hour for this route today
+    hourly = []
+    for h in range(24):
+        th = (predict_traffic(h, day, weather, holiday, origin)
+              + predict_traffic(h, day, weather, holiday, dest)) / 2
+        hourly.append(th)
+    best_hour = int(np.argmin(hourly))
+    best_speed = SPEED_BY_SIGNAL[classify(int(hourly[best_hour]))["signal"]]
+    best_minutes = int(round(distance / best_speed * 60))
+
+    return jsonify({
+        "origin": {"name": o["name"], "lat": o["lat"], "lng": o["lng"], "traffic": t_origin},
+        "destination": {"name": d["name"], "lat": d["lat"], "lng": d["lng"], "traffic": t_dest},
+        "route_traffic": route_traffic,
+        **result,
+        "distance_km": round(distance, 1),
+        "eta_minutes": minutes,
+        "best_hour": best_hour,
+        "best_eta_minutes": best_minutes,
+    })
 
 if __name__ == "__main__":
     # Local development server. In production (Render), gunicorn runs the app

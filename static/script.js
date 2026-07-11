@@ -80,6 +80,7 @@ async function predict() {
     day: document.getElementById("day").value,
     weather: document.getElementById("weather").value,
     holiday: document.getElementById("holiday").value,
+    zone: document.getElementById("zone").value,
   };
 
   try {
@@ -130,5 +131,118 @@ btn.addEventListener("click", predict);
 document.getElementById("hour").addEventListener("keydown", (e) => {
   if (e.key === "Enter") predict();
 });
+
+
+
+/* ==========================================================
+   ROUTE PLANNER — Origin to Destination on a Leaflet map
+   ========================================================== */
+
+const routeBtn = document.getElementById("routeBtn");
+let map = null;
+let routeLayer = null;
+
+function initMap() {
+  map = L.map("map").setView([13.02, 80.20], 11); // Chennai
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18,
+    attribution: "© OpenStreetMap contributors",
+  }).addTo(map);
+}
+
+const SIGNAL_COLORS = { green: "#37d67a", amber: "#ffb020", red: "#ff5a5a" };
+
+async function drawRoadRoute(o, d, color) {
+  // Try OSRM's free demo server for the real road path;
+  // fall back to a straight dashed line if it is unreachable.
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/` +
+      `${o.lng},${o.lat};${d.lng},${d.lat}?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("osrm unavailable");
+    const json = await res.json();
+    const coords = json.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
+    return L.polyline(coords, { color, weight: 5, opacity: 0.85 });
+  } catch {
+    return L.polyline(
+      [[o.lat, o.lng], [d.lat, d.lng]],
+      { color, weight: 4, dashArray: "8 8", opacity: 0.8 }
+    );
+  }
+}
+
+async function predictRoute() {
+  const errEl = document.getElementById("routeError");
+  errEl.textContent = "";
+
+  const origin = document.getElementById("origin").value;
+  const destination = document.getElementById("destination").value;
+  if (origin === destination) {
+    errEl.textContent = "Origin and destination must be different.";
+    return;
+  }
+
+  routeBtn.disabled = true;
+  routeBtn.textContent = "Predicting…";
+
+  const payload = {
+    origin,
+    destination,
+    hour: document.getElementById("hour").value,
+    day: document.getElementById("day").value,
+    weather: document.getElementById("weather").value,
+    holiday: document.getElementById("holiday").value,
+  };
+
+  try {
+    const res = await fetch("/api/route", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Route request failed");
+    const data = await res.json();
+
+    // Fill in the result card
+    document.getElementById("routeResult").classList.remove("hidden");
+    document.getElementById("routeDistance").textContent = data.distance_km;
+    document.getElementById("routeEta").textContent = data.eta_minutes;
+    document.getElementById("routeOriginT").textContent = data.origin.traffic;
+    document.getElementById("routeDestT").textContent = data.destination.traffic;
+
+    const levelEl = document.getElementById("routeLevel");
+    levelEl.textContent = data.level;
+    levelEl.style.color = SIGNAL_COLORS[data.signal];
+
+    document.getElementById("routeAdvice").textContent =
+      `${data.advice} Best departure time today: ${hourLabel(data.best_hour)} ` +
+      `(~${data.best_eta_minutes} min).`;
+
+    // Draw on the map
+    if (!map) initMap();
+    if (routeLayer) map.removeLayer(routeLayer);
+
+    const line = await drawRoadRoute(data.origin, data.destination,
+                                     SIGNAL_COLORS[data.signal]);
+    const oMark = L.marker([data.origin.lat, data.origin.lng])
+      .bindPopup(`<b>${data.origin.name}</b><br>${data.origin.traffic} veh/hr`);
+    const dMark = L.marker([data.destination.lat, data.destination.lng])
+      .bindPopup(`<b>${data.destination.name}</b><br>${data.destination.traffic} veh/hr`);
+
+    routeLayer = L.layerGroup([line, oMark, dMark]).addTo(map);
+    map.fitBounds(line.getBounds(), { padding: [30, 30] });
+  } catch (err) {
+    errEl.textContent = "Could not predict the route. Is the server running?";
+    console.error(err);
+  } finally {
+    routeBtn.disabled = false;
+    routeBtn.textContent = "Predict route";
+  }
+}
+
+routeBtn.addEventListener("click", predictRoute);
+
+// Show the Chennai map as soon as the page loads
+document.addEventListener("DOMContentLoaded", initMap);
 
 console.log("Traffic Prediction System Loaded Successfully");
