@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<div id="cursorGlow"></div>
 <div id="rainLayer" class="weather-layer"></div>
 <div id="fogLayer" class="weather-layer"></div>
 
@@ -27,6 +28,7 @@
 </nav>
 
 <header class="hero">
+  <div class="road-scene"><div class="road-plane"></div></div>
   <p class="eyebrow">MACHINE LEARNING · MINI PROJECT</p>
   <h1>Traffic Flow Prediction</h1>
   <p class="hero-sub">
@@ -151,18 +153,20 @@
       </div>
     </div>
 
-    <div id="map"></div>
+    <div>
+      <div id="map"></div>
+      <div class="route-chips hidden" id="routeChips"></div>
+    </div>
   </div>
 
   <!-- Transport mode comparison -->
   <div class="modes hidden" id="modeCards"></div>
 
-  <!-- The Commute Race -->
+  <!-- The Commute Race (runs on the map above) -->
   <div class="race hidden" id="raceTrack">
-    <h3 class="race-title">🏁 The Commute Race — who reaches first?</h3>
-    <div id="raceLanes"></div>
+    <h3 class="race-title">🏁 The Commute Race — watch the vehicles on the map</h3>
     <p class="panel-sub" id="raceCaption"></p>
-    <button type="button" id="replayBtn" class="replay-btn">↻ Replay race</button>
+    <button type="button" id="replayBtn" class="replay-btn">↻ Replay race on map</button>
   </div>
 </section>
 
