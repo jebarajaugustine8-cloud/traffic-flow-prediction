@@ -219,6 +219,10 @@
       <img src="{{ url_for('static', filename='graphs/importance.png') }}" alt="Feature importance">
       <figcaption>What the model relies on</figcaption>
     </figure>
+    <figure class="graph-card wide">
+      <img src="{{ url_for('static', filename='graphs/zone_graph.png') }}" alt="Chennai zone road graph">
+      <figcaption>The Chennai road graph used by the Graph Neural Network — 16 zones, 33 road connections</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -246,6 +250,22 @@
   </table>
 
   <p class="feature-list"><strong>Features used:</strong> {{ metrics.features | join(", ") }}</p>
+
+  {% if metrics_gnn %}
+  <div class="real-benchmark">
+    <h3 class="race-title">🕸️ Graph Neural Network — {{ metrics_gnn.graph.nodes }} nodes, {{ metrics_gnn.graph.edges }} edges</h3>
+    <p class="panel-sub">Chennai's zones modelled as a road graph ({{ metrics_gnn.graph.rule }}).
+       A 2-layer <strong>Graph Convolutional Network</strong> built from scratch in PyTorch predicts all
+       {{ metrics_gnn.graph.nodes }} zones simultaneously through message passing between road neighbours.</p>
+    <div class="gnn-stats">
+      <div class="card"><p class="card-label">GCN Accuracy (R²)</p><p class="card-value">{{ metrics_gnn.r2 }}%</p></div>
+      <div class="card"><p class="card-label">GCN MAE</p><p class="card-value">{{ metrics_gnn.mae }} <small>veh/hr</small></p></div>
+      <div class="card"><p class="card-label">vs Gradient Boosting</p><p class="card-value">{{ metrics.models[metrics.best_model].r2 }}%</p></div>
+      <div class="card"><p class="card-label">Parameters</p><p class="card-value">{{ "{:,}".format(metrics_gnn.params) }}</p></div>
+    </div>
+    <p class="feature-list">{{ metrics_gnn.note }}</p>
+  </div>
+  {% endif %}
 
   {% if metrics_real %}
   <div class="real-benchmark">

@@ -38,6 +38,12 @@ if os.path.exists("model/metrics_real.json"):
     with open("model/metrics_real.json") as f:
         METRICS_REAL = json.load(f)
 
+# Graph Neural Network results (train_gnn.py) — optional research module
+METRICS_GNN = None
+if os.path.exists("model/metrics_gnn.json"):
+    with open("model/metrics_gnn.json") as f:
+        METRICS_GNN = json.load(f)
+
 # SHAP explainer — explains every prediction (Explainable AI)
 EXPLAINER = shap.TreeExplainer(model)
 FEATURE_LABELS = {
@@ -96,7 +102,7 @@ def classify(traffic: int) -> dict:
 
 @app.route("/")
 def home():
-    return render_template("index.html", metrics=METRICS, metrics_real=METRICS_REAL, zones=CHENNAI_ZONES)
+    return render_template("index.html", metrics=METRICS, metrics_real=METRICS_REAL, metrics_gnn=METRICS_GNN, zones=CHENNAI_ZONES)
 
 
 @app.route("/api/predict", methods=["POST"])

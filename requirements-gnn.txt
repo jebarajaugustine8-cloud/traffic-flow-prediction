@@ -1,0 +1,2 @@
+# Optional research module — Graph Neural Network (not needed for deployment)
+torch

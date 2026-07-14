@@ -727,3 +727,6 @@ button:disabled{ opacity:.55; cursor:wait; transform:none; }
 @keyframes blink{ 50%{ opacity:0; } }
 
 .real-benchmark{ margin-top:30px; border-top:1px dashed var(--line); padding-top:22px; }
+
+.gnn-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:16px 0; }
+@media (max-width:860px){ .gnn-stats{ grid-template-columns:repeat(2,1fr); } }

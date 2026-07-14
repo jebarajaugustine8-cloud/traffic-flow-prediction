@@ -1,0 +1,12 @@
+{
+  "model": "Graph Convolutional Network (2-layer GCN, from scratch in PyTorch)",
+  "graph": {
+    "nodes": 16,
+    "edges": 34,
+    "rule": "zones within 6.5 km are connected"
+  },
+  "r2": 98.48,
+  "mae": 16.59,
+  "params": 5505,
+  "note": "Predicts all 16 zones simultaneously via message passing; each zone's prediction is informed by its road neighbours."
+}
