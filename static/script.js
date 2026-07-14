@@ -179,8 +179,47 @@ function syntheticRoute(o, d, bow) {
   return pts;
 }
 
+/* Ask OSRM for one route (optionally passing THROUGH a via point).
+   Returns {coords, distKm} following REAL roads, or null on failure. */
+async function osrmRoute(points) {
+  try {
+    const path = points.map((p) => `${p.lng},${p.lat}`).join(";");
+    const url = `https://router.project-osrm.org/route/v1/driving/${path}` +
+      `?overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const json = await res.json();
+    if (!json.routes || !json.routes.length) return null;
+    const r = json.routes[0];
+    return {
+      coords: r.geometry.coordinates.map((c) => [c[1], c[0]]),
+      distKm: r.distance / 1000,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/* A detour point placed sideways from the midpoint of the trip.
+   Routing THROUGH this point forces OSRM onto different real roads. */
+function viaPoint(o, d, offset) {
+  const midLat = (o.lat + d.lat) / 2, midLng = (o.lng + d.lng) / 2;
+  const dx = d.lng - o.lng, dy = d.lat - o.lat;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1e-6;
+  // scale the sideways push with trip length (min ~1.2 km, max ~4 km)
+  const push = Math.min(Math.max(len * 0.35, 0.012), 0.04) * Math.sign(offset);
+  return { lat: midLat + (-dx / len) * push, lng: midLng + (dy / len) * push };
+}
+
+/* Two routes are "the same road" if their lengths are within 8% */
+function isDuplicate(r, list) {
+  return list.some((x) => Math.abs(x.distKm - r.distKm) / x.distKm < 0.08);
+}
+
 async function fetchRoutes(o, d) {
-  let found = [];
+  const found = [];
+
+  // 1. The direct route + OSRM's own alternatives (all real roads)
   try {
     const url = `https://router.project-osrm.org/route/v1/driving/` +
       `${o.lng},${o.lat};${d.lng},${d.lat}` +
@@ -188,21 +227,41 @@ async function fetchRoutes(o, d) {
     const res = await fetch(url);
     if (res.ok) {
       const json = await res.json();
-      found = (json.routes || []).slice(0, 3).map((r) => ({
-        coords: r.geometry.coordinates.map((c) => [c[1], c[0]]),
-        distKm: r.distance / 1000,
-      }));
+      (json.routes || []).slice(0, 3).forEach((r) => {
+        const route = {
+          coords: r.geometry.coordinates.map((c) => [c[1], c[0]]),
+          distKm: r.distance / 1000,
+          real: true,
+        };
+        if (!isDuplicate(route, found)) found.push(route);
+      });
     }
-  } catch { /* offline / blocked — fall through */ }
+  } catch { /* server unreachable — handled below */ }
 
-  // top up to 3 with synthetic alternatives
-  const bows = [0.035, -0.03, 0.06];
+  // 2. Not enough? Force REAL detour routes through side via-points.
+  const offsets = [1, -1, 1.8, -1.8];
+  for (const off of offsets) {
+    if (found.length >= 3) break;
+    const via = viaPoint(o, d, off);
+    const r = await osrmRoute([o, via, d]);
+    if (r && !isDuplicate(r, found)) {
+      r.real = true;
+      found.push(r);
+    }
+  }
+
+  // 3. Absolute last resort (no internet at all): approximate curves,
+  //    clearly labelled so nobody mistakes them for real roads.
+  const bows = [0.0, 0.035, -0.03];
   let bi = 0;
   while (found.length < 3 && bi < bows.length) {
-    const coords = syntheticRoute(o, d, bows[bi++]);
-    found.push({ coords, distKm: pathLengthKm(coords) });
+    const coords = bows[bi] === 0
+      ? [[o.lat, o.lng], [d.lat, d.lng]]
+      : syntheticRoute(o, d, bows[bi]);
+    found.push({ coords, distKm: pathLengthKm(coords) * 1.35, real: false });
+    bi++;
   }
-  return found;
+  return found.slice(0, 3);
 }
 
 /* --- drawing + selecting alternatives --- */
@@ -226,7 +285,9 @@ function renderChips(signal) {
     chip.type = "button";
     chip.className = "chip" + (i === activeRoute ? " active" : "");
     const carEta = etaForDistance(r.distKm, "car", signal);
-    chip.textContent = `Route ${i + 1} · ${r.distKm.toFixed(1)} km · ~${carEta} min by car`;
+    const tag = i === 0 ? "Main road" : `Alternative ${i}`;
+    const approx = r.real === false ? " (approximate path)" : "";
+    chip.textContent = `${tag} · ${r.distKm.toFixed(1)} km · about ${carEta} min by car${approx}`;
     chip.addEventListener("click", () => {
       activeRoute = i;
       styleRoutes(signal);
@@ -325,10 +386,12 @@ function startMapRace() {
   raceTimer = requestAnimationFrame(frame);
 
   const winner = sorted[0];
+  const roadName = activeRoute === 0 ? "the main road" : `alternative road ${activeRoute}`;
   document.getElementById("raceCaption").textContent =
-    `On Route ${activeRoute + 1} (${route.distKm.toFixed(1)} km): ` +
-    `${winner.icon} ${winner.name} wins at ${winner.eta} min. ` +
-    `Vehicles move along the real road at speeds scaled to their predicted ETAs.`;
+    `On ${roadName} (${route.distKm.toFixed(1)} km), the fastest way to travel is ` +
+    `${winner.icon} ${winner.name} — about ${winner.eta} minutes. ` +
+    `Each vehicle on the map moves at a speed matching its predicted travel time. ` +
+    `Tip: click any road line or button below the map to compare routes.`;
   document.getElementById("raceTrack").classList.remove("hidden");
 }
 
