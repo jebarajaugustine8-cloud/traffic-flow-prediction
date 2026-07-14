@@ -109,6 +109,13 @@ async function predict() {
 
     drawForecast(data.forecast, parseInt(payload.hour, 10), data.best_hour, data.worst_hour);
     renderExplanation(data.explanation);
+
+    if (data.signal === "red") {
+      const zoneName = document.getElementById("zone").selectedOptions[0].text;
+      congestionAlert("Heavy congestion expected in " + zoneName + " at " +
+        hourLabel(parseInt(payload.hour, 10)) + " — best hour to travel: " +
+        hourLabel(data.best_hour) + ".");
+    }
   } catch (err) {
     errorMsg.textContent = "Could not get a prediction. Is the server running?";
     console.error(err);
@@ -464,6 +471,13 @@ async function predictRoute() {
 
     renderModeCards(data.modes, data.fastest_mode);
 
+    if (data.signal === "red") {
+      const fm = data.modes.find((m) => m.key === data.fastest_mode);
+      congestionAlert("Heavy traffic on " + data.origin.name + " to " + data.destination.name +
+        " — fastest option: " + fm.icon + " " + fm.name + " (" + fm.eta_minutes +
+        " min). Best departure: " + hourLabel(data.best_hour) + ".");
+    }
+
     // map: clear previous, fetch up to 3 alternatives, draw all
     if (!map) initMap();
     clearRacers();
@@ -580,6 +594,63 @@ if (!reduceMotion && !isTouch && glow) {
 }
 
 
+
+
+
+/* ==========================================================
+   LIVE WEATHER — auto-detected from the Open-Meteo API
+   (free, no key needed). Sets the weather dropdown for
+   Chennai automatically; the user can still change it.
+   ========================================================== */
+
+async function detectLiveWeather() {
+  try {
+    const url = "https://api.open-meteo.com/v1/forecast" +
+      "?latitude=13.08&longitude=80.27&current=weather_code,temperature_2m";
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const j = await res.json();
+    const code = j.current.weather_code;
+    const temp = Math.round(j.current.temperature_2m);
+
+    // WMO weather codes -> our 3 categories
+    let value = "0", label = "Clear";
+    if ([45, 48].includes(code)) { value = "2"; label = "Fog"; }
+    else if (code >= 51) { value = "1"; label = "Rain"; }
+
+    document.getElementById("weather").value = value;
+    applyWeatherEffect();
+
+    const badge = document.getElementById("weatherBadge");
+    badge.textContent = "Live Chennai weather: " + label + " · " + temp +
+      "°C (auto-detected — you can still change it)";
+    badge.classList.remove("hidden");
+  } catch { /* offline — user selects manually, nothing breaks */ }
+}
+document.addEventListener("DOMContentLoaded", detectLiveWeather);
+
+/* ==========================================================
+   CONGESTION ALERTS — banner + optional browser notification
+   ========================================================== */
+
+const alertBanner = document.getElementById("alertBanner");
+document.getElementById("alertClose").addEventListener("click", () =>
+  alertBanner.classList.add("hidden"));
+
+function congestionAlert(message) {
+  document.getElementById("alertText").textContent = message;
+  alertBanner.classList.remove("hidden");
+  clearTimeout(congestionAlert._t);
+  congestionAlert._t = setTimeout(() => alertBanner.classList.add("hidden"), 12000);
+
+  if ("Notification" in window) {
+    if (Notification.permission === "granted") {
+      new Notification("🚦 Traffic Alert", { body: message });
+    } else if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }
+}
 
 /* ---------- SHAP explanation bars ---------- */
 

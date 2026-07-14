@@ -1,12 +1,20 @@
 {
-  "model": "Graph Convolutional Network (2-layer GCN, from scratch in PyTorch)",
   "graph": {
     "nodes": 16,
     "edges": 34,
     "rule": "zones within 6.5 km are connected"
   },
-  "r2": 98.48,
-  "mae": 16.59,
-  "params": 5505,
-  "note": "Predicts all 16 zones simultaneously via message passing; each zone's prediction is informed by its road neighbours."
+  "gcn": {
+    "name": "Graph Convolutional Network (spatial)",
+    "r2": 98.48,
+    "mae": 16.59,
+    "params": 5505
+  },
+  "stgcn": {
+    "name": "Spatio-Temporal GCN (past 3 hours + road graph)",
+    "r2": 96.89,
+    "mae": 27.64,
+    "params": 5697
+  },
+  "note": "The ST-GCN sees each zone's last 3 hours of traffic AND shares that history with road neighbours via message passing \u2014 modelling how congestion flows through the city over space and time."
 }

@@ -133,6 +133,44 @@ def build_samples():
 
 
 # ------------------------------------------------------------------
+# 2b. SPATIO-TEMPORAL samples — traffic history as a time series
+#     The dataset is written in chronological order (day -> hour ->
+#     16 zones), so we can reconstruct the city's hour-by-hour history
+#     and train a model that sees the PAST 3 HOURS of every zone.
+# ------------------------------------------------------------------
+
+HISTORY = 3  # hours of past traffic the ST model can see
+
+
+def build_temporal_samples():
+    df = pd.read_csv("dataset/traffic.csv")
+    T = len(df) // N_ZONES
+    traffic = df["Traffic"].values.reshape(T, N_ZONES).astype(np.float32)
+    heads = df.iloc[::N_ZONES]                     # one row per timestep
+    hours = heads["Hour"].values
+    days = heads["Day"].values
+    weather = heads["Weather"].values
+    holiday = heads["Holiday"].values
+
+    X_hist, X_time, Y = [], [], []
+    for t in range(HISTORY, T):
+        X_hist.append(traffic[t - HISTORY:t])       # (HISTORY, N)
+        X_time.append([
+            np.sin(2 * np.pi * hours[t] / 24),
+            np.cos(2 * np.pi * hours[t] / 24),
+            days[t] / 7.0,
+            float(weather[t] == 0), float(weather[t] == 1), float(weather[t] == 2),
+            float(holiday[t]),
+            float(days[t] >= 6),
+            float(hours[t] in (8, 9, 17, 18, 19)),
+        ])
+        Y.append(traffic[t])                        # next hour, all zones
+    return (torch.tensor(np.array(X_hist)),
+            torch.tensor(np.array(X_time), dtype=torch.float32),
+            torch.tensor(np.array(Y)))
+
+
+# ------------------------------------------------------------------
 # 3. The GCN, from scratch
 # ------------------------------------------------------------------
 
@@ -166,6 +204,39 @@ class TrafficGCN(nn.Module):
         return self.head(h).squeeze(-1)          # (B, N) traffic per zone
 
 
+class TrafficSTGCN(nn.Module):
+    """SPATIO-TEMPORAL GCN: each zone's input includes its own last
+    3 hours of traffic (temporal) and message passing shares that
+    history with road neighbours (spatial) — so congestion visibly
+    'flows' through the graph from one hour to the next."""
+
+    def __init__(self, A_hat, time_dim=9, emb_dim=8, hidden=64):
+        super().__init__()
+        self.node_emb = nn.Embedding(N_ZONES, emb_dim)
+        self.gcn1 = GCNLayer(HISTORY + time_dim + emb_dim, hidden, A_hat)
+        self.gcn2 = GCNLayer(hidden, hidden, A_hat)
+        self.head = nn.Linear(hidden, 1)
+        self.act = nn.ReLU()
+
+    def forward(self, x_hist, x_time):
+        # x_hist: (B, HISTORY, N) -> (B, N, HISTORY) per-node history
+        B = x_time.shape[0]
+        hist = x_hist.permute(0, 2, 1)
+        emb = self.node_emb(torch.arange(N_ZONES)).unsqueeze(0).expand(B, -1, -1)
+        time = x_time.unsqueeze(1).expand(-1, N_ZONES, -1)
+        h = torch.cat([hist, time, emb], dim=-1)
+        h = self.act(self.gcn1(h))
+        h = self.act(self.gcn2(h))
+        return self.head(h).squeeze(-1)
+
+
+def r2_mae(y_true, y_pred):
+    y_true, y_pred = y_true.ravel(), y_pred.ravel()
+    ss_res = ((y_true - y_pred) ** 2).sum()
+    ss_tot = ((y_true - y_true.mean()) ** 2).sum()
+    return 1 - ss_res / ss_tot, np.abs(y_true - y_pred).mean()
+
+
 # ------------------------------------------------------------------
 # 4. Train & evaluate
 # ------------------------------------------------------------------
@@ -175,57 +246,66 @@ def main():
     plot_graph(A)
     print(f"Chennai zone graph: {N_ZONES} nodes, {int(A.sum() / 2)} edges")
 
+    # ---------- Model A: static GCN (time features only) ----------
     X, Y = build_samples()
-    print(f"Graph samples: {X.shape[0]} situations × {N_ZONES} zones")
-
-    # normalise targets for stable training
+    print(f"\n[GCN] {X.shape[0]} situations x {N_ZONES} zones")
     y_mean, y_std = Y.mean(), Y.std()
     Yn = (Y - y_mean) / y_std
-
-    idx = torch.randperm(X.shape[0])
-    split = int(0.8 * len(idx))
+    idx = torch.randperm(X.shape[0]); split = int(0.8 * len(idx))
     tr, te = idx[:split], idx[split:]
 
-    model = TrafficGCN(A_hat)
-    opt = torch.optim.Adam(model.parameters(), lr=0.005)
+    gcn = TrafficGCN(A_hat)
+    opt = torch.optim.Adam(gcn.parameters(), lr=0.005)
     loss_fn = nn.MSELoss()
-
     for epoch in range(400):
-        model.train()
         opt.zero_grad()
-        loss = loss_fn(model(X[tr]), Yn[tr])
-        loss.backward()
-        opt.step()
-        if (epoch + 1) % 100 == 0:
-            print(f"  epoch {epoch+1:>3}  train MSE {loss.item():.4f}")
-
-    model.eval()
+        loss = loss_fn(gcn(X[tr]), Yn[tr]); loss.backward(); opt.step()
+    gcn.eval()
     with torch.no_grad():
-        pred = model(X[te]) * y_std + y_mean
+        pred = gcn(X[te]) * y_std + y_mean
+    r2_g, mae_g = r2_mae(Y[te].numpy(), pred.numpy())
+    print(f"[GCN]     R² {r2_g*100:.2f}%   MAE {mae_g:.2f}")
 
-    y_true = Y[te].numpy().ravel()
-    y_pred = pred.numpy().ravel()
-    ss_res = ((y_true - y_pred) ** 2).sum()
-    ss_tot = ((y_true - y_true.mean()) ** 2).sum()
-    r2 = 1 - ss_res / ss_tot
-    mae = np.abs(y_true - y_pred).mean()
-
-    print(f"\nGCN test R²: {r2*100:.2f}%   MAE: {mae:.2f} vehicles/hour")
+    # ---------- Model B: SPATIO-TEMPORAL GCN (past 3 hours) ----------
+    Xh, Xt, Ys = build_temporal_samples()
+    print(f"[ST-GCN]  {Xh.shape[0]} hourly steps, each seeing the past {HISTORY} hours")
+    ys_mean, ys_std = Ys.mean(), Ys.std()
+    Xhn = (Xh - ys_mean) / ys_std
+    Ysn = (Ys - ys_mean) / ys_std
+    # chronological split (train on first 80% of time — no future leakage)
+    split = int(0.8 * Xh.shape[0])
+    st = TrafficSTGCN(A_hat)
+    opt = torch.optim.Adam(st.parameters(), lr=0.005)
+    for epoch in range(400):
+        opt.zero_grad()
+        loss = loss_fn(st(Xhn[:split], Xt[:split]), Ysn[:split])
+        loss.backward(); opt.step()
+        if (epoch + 1) % 100 == 0:
+            print(f"  [ST-GCN] epoch {epoch+1:>3}  train MSE {loss.item():.4f}")
+    st.eval()
+    with torch.no_grad():
+        pred = st(Xhn[split:], Xt[split:]) * ys_std + ys_mean
+    r2_s, mae_s = r2_mae(Ys[split:].numpy(), pred.numpy())
+    print(f"[ST-GCN]  R² {r2_s*100:.2f}%   MAE {mae_s:.2f}")
 
     metrics = {
-        "model": "Graph Convolutional Network (2-layer GCN, from scratch in PyTorch)",
         "graph": {"nodes": N_ZONES, "edges": int(A.sum() / 2),
                   "rule": f"zones within {CONNECT_KM} km are connected"},
-        "r2": round(float(r2) * 100, 2),
-        "mae": round(float(mae), 2),
-        "params": int(sum(p.numel() for p in model.parameters())),
-        "note": ("Predicts all 16 zones simultaneously via message passing; "
-                 "each zone's prediction is informed by its road neighbours."),
+        "gcn": {"name": "Graph Convolutional Network (spatial)",
+                "r2": round(float(r2_g) * 100, 2), "mae": round(float(mae_g), 2),
+                "params": int(sum(p.numel() for p in gcn.parameters()))},
+        "stgcn": {"name": f"Spatio-Temporal GCN (past {HISTORY} hours + road graph)",
+                  "r2": round(float(r2_s) * 100, 2), "mae": round(float(mae_s), 2),
+                  "params": int(sum(p.numel() for p in st.parameters()))},
+        "note": ("The ST-GCN sees each zone's last 3 hours of traffic AND shares that "
+                 "history with road neighbours via message passing — modelling how "
+                 "congestion flows through the city over space and time."),
     }
     with open("model/metrics_gnn.json", "w") as f:
         json.dump(metrics, f, indent=2)
-    torch.save(model.state_dict(), "model/traffic_gcn.pt")
-    print("✅ Saved model/metrics_gnn.json, model/traffic_gcn.pt, static/graphs/zone_graph.png")
+    torch.save(gcn.state_dict(), "model/traffic_gcn.pt")
+    torch.save(st.state_dict(), "model/traffic_stgcn.pt")
+    print("✅ Saved metrics_gnn.json (GCN + ST-GCN), model weights, zone_graph.png")
 
 
 if __name__ == "__main__":

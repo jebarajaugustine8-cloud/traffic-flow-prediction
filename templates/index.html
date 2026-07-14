@@ -11,6 +11,10 @@
 </head>
 <body>
 <div id="cursorGlow"></div>
+<div id="alertBanner" class="alert-banner hidden">
+  <span id="alertText"></span>
+  <button type="button" id="alertClose" class="alert-close">&#10005;</button>
+</div>
 <div id="rainLayer" class="weather-layer"></div>
 <div id="fogLayer" class="weather-layer"></div>
 
@@ -72,6 +76,7 @@
         <option value="1">Rain</option>
         <option value="2">Fog</option>
       </select>
+      <p class="weather-badge hidden" id="weatherBadge"></p>
 
       <label for="holiday">Public holiday</label>
       <select id="holiday">
@@ -255,13 +260,15 @@
   <div class="real-benchmark">
     <h3 class="race-title">🕸️ Graph Neural Network — {{ metrics_gnn.graph.nodes }} nodes, {{ metrics_gnn.graph.edges }} edges</h3>
     <p class="panel-sub">Chennai's zones modelled as a road graph ({{ metrics_gnn.graph.rule }}).
-       A 2-layer <strong>Graph Convolutional Network</strong> built from scratch in PyTorch predicts all
-       {{ metrics_gnn.graph.nodes }} zones simultaneously through message passing between road neighbours.</p>
+       Two graph models built from scratch in PyTorch: a spatial <strong>GCN</strong>, and a
+       <strong>Spatio-Temporal GCN</strong> that also sees each zone's past 3 hours of traffic,
+       letting congestion flow through the road graph over time.
+       Both predict all {{ metrics_gnn.graph.nodes }} zones simultaneously.</p>
     <div class="gnn-stats">
-      <div class="card"><p class="card-label">GCN Accuracy (R²)</p><p class="card-value">{{ metrics_gnn.r2 }}%</p></div>
-      <div class="card"><p class="card-label">GCN MAE</p><p class="card-value">{{ metrics_gnn.mae }} <small>veh/hr</small></p></div>
-      <div class="card"><p class="card-label">vs Gradient Boosting</p><p class="card-value">{{ metrics.models[metrics.best_model].r2 }}%</p></div>
-      <div class="card"><p class="card-label">Parameters</p><p class="card-value">{{ "{:,}".format(metrics_gnn.params) }}</p></div>
+      <div class="card"><p class="card-label">GCN (spatial) R²</p><p class="card-value">{{ metrics_gnn.gcn.r2 }}%</p></div>
+      <div class="card"><p class="card-label">ST-GCN (space + time) R²</p><p class="card-value">{{ metrics_gnn.stgcn.r2 }}%</p></div>
+      <div class="card"><p class="card-label">Gradient Boosting R²</p><p class="card-value">{{ metrics.models[metrics.best_model].r2 }}%</p></div>
+      <div class="card"><p class="card-label">ST-GCN task</p><p class="card-value" style="font-size:15px">Next-hour forecast<br><small>from past 3 hours</small></p></div>
     </div>
     <p class="feature-list">{{ metrics_gnn.note }}</p>
   </div>
