@@ -5,3 +5,4 @@ numpy
 matplotlib
 joblib
 gunicorn
+shap

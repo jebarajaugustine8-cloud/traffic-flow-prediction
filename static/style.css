@@ -667,3 +667,63 @@ button:disabled{ opacity:.55; cursor:wait; transform:none; }
   #map{ min-height:320px; }
   #cursorGlow{ display:none; }
 }
+
+/* ---------------- SHAP EXPLANATION ---------------- */
+.explain{ margin-top:18px; border-top:1px dashed var(--line); padding-top:14px; }
+.explain-title{
+  font-family:var(--display);
+  font-size:14px;
+  letter-spacing:.5px;
+  color:var(--text);
+}
+.explain-title span{ color:var(--muted); font-family:var(--body); font-size:11.5px; letter-spacing:0; }
+.explain-base{ font-size:12.5px; color:var(--muted); margin:6px 0 10px; }
+.shap-row{ display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.shap-name{ flex:0 0 150px; font-size:11.5px; color:var(--muted); text-align:right; }
+.shap-track{ flex:1; height:14px; position:relative; }
+.shap-track::before{
+  content:""; position:absolute; left:50%; top:-2px; bottom:-2px;
+  width:1px; background:var(--line-bright);
+}
+.shap-fill{
+  position:absolute; top:0; bottom:0;
+  width:0; border-radius:3px;
+  transition:width .8s cubic-bezier(.2,.8,.2,1);
+}
+.shap-fill.pos{ left:50%; background:linear-gradient(90deg, rgba(255,90,90,.5), var(--red)); box-shadow:0 0 8px rgba(255,90,90,.5); }
+.shap-fill.neg{ right:50%; background:linear-gradient(270deg, rgba(55,214,122,.5), var(--green)); box-shadow:0 0 8px rgba(55,214,122,.5); }
+.shap-val{ flex:0 0 58px; font-family:var(--display); font-size:12px; font-weight:700; }
+.shap-val.pos{ color:var(--red); }
+.shap-val.neg{ color:var(--green); }
+
+/* ---------------- AI REPORT ---------------- */
+.report-card{
+  margin-top:14px;
+  background:rgba(3,4,12,.85);
+  border:1px solid var(--line-bright);
+  border-radius:12px;
+  padding:16px 18px;
+  box-shadow:0 0 26px rgba(0,229,255,.12);
+}
+.report-label{
+  font-family:var(--display);
+  font-size:11px;
+  letter-spacing:3px;
+  color:var(--cyan);
+  margin-bottom:8px;
+}
+.report-text{
+  font-size:14px;
+  color:var(--text);
+  line-height:1.7;
+  white-space:pre-wrap;
+}
+.report-text::after{
+  content:"▌";
+  color:var(--cyan);
+  animation:blink 1s steps(1) infinite;
+}
+.report-text.done::after{ content:""; }
+@keyframes blink{ 50%{ opacity:0; } }
+
+.real-benchmark{ margin-top:30px; border-top:1px dashed var(--line); padding-top:22px; }

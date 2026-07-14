@@ -53,6 +53,12 @@ python app.py                # 4. start the website → http://127.0.0.1:5000
 (The trained model, metrics and graphs are already included, so you can also
 just run `python app.py` directly.)
 
+## New in v6 — Explainable AI, Real-World Benchmark & AI Reports
+
+- **SHAP Explainable AI**: every prediction shows *why* — which features pushed traffic up or down (e.g. "+206 time-of-day, +97 rush hour, +86 T. Nagar zone")
+- **Real-world benchmark**: `train_real_dataset.py` retrains the identical pipeline on the UCI *Metro Interstate Traffic Volume* dataset — 48,204 real sensor records from Interstate 94 (2012-2018) — achieving **94.74% R²**, shown on the site next to the synthetic results
+- **AI traffic reports**: a "Generate AI Traffic Report" button produces a natural-language advisory. With an `ANTHROPIC_API_KEY` environment variable set it uses Claude (LLM); without one it falls back to a rule-based report so demos never break
+
 ## New in v3 — Location support (Chennai)
 
 - **16 real Chennai localities** (Vadapalani, T. Nagar, Guindy, Koyambedu, Velachery, Tambaram, OMR, Airport...) with real coordinates

@@ -1,0 +1,23 @@
+{
+  "dataset": "UCI Metro Interstate Traffic Volume (real sensor data)",
+  "source": "Interstate 94, Minneapolis \u2014 2012 to 2018",
+  "rows": 48204,
+  "best_model": "Gradient Boosting",
+  "models": {
+    "Linear Regression": {
+      "r2": 77.02,
+      "mae": 712.57,
+      "rmse": 953.15
+    },
+    "Random Forest": {
+      "r2": 94.63,
+      "mae": 261.96,
+      "rmse": 460.58
+    },
+    "Gradient Boosting": {
+      "r2": 94.74,
+      "mae": 265.85,
+      "rmse": 455.94
+    }
+  }
+}
