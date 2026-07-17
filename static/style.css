@@ -773,3 +773,19 @@ button:disabled{ opacity:.55; cursor:wait; transform:none; }
   background:var(--cyan); box-shadow:0 0 8px var(--cyan);
   animation:pulse 2s infinite;
 }
+
+/* ---------------- CURRENT LOCATION ---------------- */
+.loc-row{ display:flex; gap:8px; }
+.loc-row select{ flex:1; }
+.loc-btn{
+  width:52px; flex:0 0 52px;
+  margin:0; padding:0;
+  font-size:20px;
+  background:rgba(8,10,26,.8);
+  border:1px solid var(--line);
+  border-radius:10px;
+  color:var(--cyan);
+}
+.loc-btn::after{ display:none; }
+.loc-btn:hover{ border-color:var(--cyan); box-shadow:0 0 14px rgba(0,229,255,.3); transform:none; }
+.loc-btn.busy{ animation:pulse 1s infinite; }

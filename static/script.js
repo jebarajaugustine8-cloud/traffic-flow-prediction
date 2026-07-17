@@ -652,6 +652,116 @@ function congestionAlert(message) {
   }
 }
 
+
+
+/* ==========================================================
+   AUTOMATIC TIME — the form opens pre-filled with the
+   current hour and day. The user can still change them.
+   ========================================================== */
+
+function autofillTime() {
+  const now = new Date();
+  document.getElementById("hour").value = now.getHours();
+  // JS: 0=Sunday..6=Saturday  ->  our model: 1=Monday..7=Sunday
+  const day = now.getDay() === 0 ? 7 : now.getDay();
+  document.getElementById("day").value = String(day);
+
+  const badge = document.getElementById("timeBadge");
+  const mins = String(now.getMinutes()).padStart(2, "0");
+  badge.textContent = "Auto-filled with the current time: " +
+    hourLabel(now.getHours()) + ":" + mins + ", " +
+    ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day] +
+    " — you can still change it";
+  badge.classList.remove("hidden");
+}
+document.addEventListener("DOMContentLoaded", autofillTime);
+
+/* ==========================================================
+   CURRENT LOCATION — one tap on 📍 finds the user's GPS
+   position and selects the nearest Chennai zone as both
+   the prediction location and the route origin.
+   ========================================================== */
+
+const ZONES_JS = Array.from(document.getElementById("zone").options).map((o) => ({
+  id: o.value, name: o.text,
+}));
+// zone coordinates come from the origin select on the same page? No —
+// we embed them once here from the map markers already used by /api/route.
+const ZONE_COORDS = {};
+
+async function loadZoneCoords() {
+  // derive from the locations the backend already exposes via a tiny fetch
+  // (fallback: hardcoded from locations.py values)
+  ZONE_COORDS[0]={lat:13.0521,lng:80.2121}; ZONE_COORDS[1]={lat:13.0418,lng:80.2341};
+  ZONE_COORDS[2]={lat:13.0850,lng:80.2101}; ZONE_COORDS[3]={lat:13.0067,lng:80.2206};
+  ZONE_COORDS[4]={lat:12.9815,lng:80.2180}; ZONE_COORDS[5]={lat:13.0012,lng:80.2565};
+  ZONE_COORDS[6]={lat:12.9249,lng:80.1000}; ZONE_COORDS[7]={lat:13.0374,lng:80.1575};
+  ZONE_COORDS[8]={lat:13.0694,lng:80.1948}; ZONE_COORDS[9]={lat:13.0732,lng:80.2609};
+  ZONE_COORDS[10]={lat:13.0827,lng:80.2757}; ZONE_COORDS[11]={lat:12.9010,lng:80.2279};
+  ZONE_COORDS[12]={lat:12.9516,lng:80.1462}; ZONE_COORDS[13]={lat:13.0337,lng:80.2687};
+  ZONE_COORDS[14]={lat:13.1189,lng:80.2329}; ZONE_COORDS[15]={lat:12.9941,lng:80.1709};
+}
+loadZoneCoords();
+
+let userMarker = null;
+
+function detectLocation() {
+  const btn = document.getElementById("locBtn");
+  const badge = document.getElementById("locBadge");
+  if (!("geolocation" in navigator)) {
+    badge.textContent = "Location is not supported by this browser.";
+    badge.classList.remove("hidden");
+    return;
+  }
+  btn.classList.add("busy");
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      btn.classList.remove("busy");
+      const me = [pos.coords.latitude, pos.coords.longitude];
+
+      // nearest zone by straight-line distance
+      let bestId = null, bestKm = Infinity;
+      for (const [id, c] of Object.entries(ZONE_COORDS)) {
+        const km = haversineKm(me, [c.lat, c.lng]);
+        if (km < bestKm) { bestKm = km; bestId = id; }
+      }
+
+      if (bestKm > 60) {
+        badge.textContent = "You appear to be outside Chennai (" +
+          bestKm.toFixed(0) + " km from the nearest zone) — please pick a zone manually.";
+        badge.classList.remove("hidden");
+        return;
+      }
+
+      // apply to prediction form AND route origin
+      document.getElementById("zone").value = bestId;
+      document.getElementById("origin").value = bestId;
+      const name = ZONES_JS.find((z) => z.id === bestId).name;
+      badge.textContent = "Your location detected — nearest zone: " + name +
+        " (" + bestKm.toFixed(1) + " km away). Set as prediction location and route origin.";
+      badge.classList.remove("hidden");
+
+      // drop a marker for the user on the map
+      if (!map) initMap();
+      if (userMarker) map.removeLayer(userMarker);
+      userMarker = L.marker(me, {
+        icon: L.divIcon({ className: "", html: '<span class="map-racer">🧍</span>',
+                          iconSize: [26, 26], iconAnchor: [13, 13] }),
+      }).addTo(map).bindPopup("<b>You are here</b><br>Nearest zone: " + name);
+      map.setView(me, 12);
+    },
+    (err) => {
+      btn.classList.remove("busy");
+      badge.textContent = err.code === 1
+        ? "Location permission denied — please pick a zone manually."
+        : "Could not detect location — please pick a zone manually.";
+      badge.classList.remove("hidden");
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+}
+document.getElementById("locBtn").addEventListener("click", detectLocation);
+
 /* ---------- SHAP explanation bars ---------- */
 
 function renderExplanation(exp) {

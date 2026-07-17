@@ -52,12 +52,17 @@
 
     <div class="form-side">
       <label for="zone">Location (Chennai)</label>
-      <select id="zone">
-        {% for z in zones %}<option value="{{ z.id }}">{{ z.name }}</option>{% endfor %}
-      </select>
+      <div class="loc-row">
+        <select id="zone">
+          {% for z in zones %}<option value="{{ z.id }}">{{ z.name }}</option>{% endfor %}
+        </select>
+        <button type="button" id="locBtn" class="loc-btn" title="Use my current location">📍</button>
+      </div>
+      <p class="weather-badge hidden" id="locBadge"></p>
 
       <label for="hour">Hour of day</label>
       <input type="number" id="hour" min="0" max="23" value="18" required>
+      <p class="weather-badge hidden" id="timeBadge"></p>
 
       <label for="day">Day of week</label>
       <select id="day">
